@@ -1,6 +1,6 @@
 # SQL++ demo
 ## Prerequisites
-Create a free [Couchbase Capella](https://cloud.couchbase.com/sign-up{target=blank}) account.  
+Create a free [Couchbase Capella](https://cloud.couchbase.com/sign-up) account.  
 
 Create a Project:  
 
@@ -603,10 +603,10 @@ ORDER BY t._t;
 
 ## Resources
 
-- **Couchbase SQL++ Docs**: [https://docs.couchbase.com/server/current/n1ql/query.html](https://docs.couchbase.com/server/current/n1ql/query.html{target=blank})
+- **Couchbase SQL++ Docs**: [https://docs.couchbase.com/server/current/n1ql/query.html](https://docs.couchbase.com/server/current/n1ql/query.html)
 - **Couchbase Capella (fully managed DBaaS)**: https://cloud.couchbase.com/sign-up
 - **OpenAI API Docs**: https://platform.openai.com/docs
 - **Vector Search Guide**: https://docs.couchbase.com/server/current/vector-search/vector-search.html
-- **Developer Tutorials**: [https://developer.couchbase.com/tutorials/](https://developer.couchbase.com/tutorials/{target=blank})
+- **Developer Tutorials**: [https://developer.couchbase.com/tutorials/](https://developer.couchbase.com/tutorials/)
 
 ---
