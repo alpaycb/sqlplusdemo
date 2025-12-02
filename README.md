@@ -21,6 +21,76 @@ Couchbase, being a JSON based data platform, is organising the data differently 
 
 <img width="466" alt="image" src="https://github.com/user-attachments/assets/c1bd8db2-b1c8-4d82-a0d3-bd952bbd7972" />
 
+## Part 2 - Key-Value Operations  
+Let's start with Key/Value (K/V) operations because they represent the speed of light for our database.
+
+In a distributed database like Couchbase, K/V operations verify the exact location of the data using a hashing algorithm, meaning there is no index scanning and no query parsing overhead. It is direct, sub-millisecond access.
+
+Here is how we execute a simple K/V lookup using the travel-sample bucket.  
+
+**Step 1**: Identify the Key
+In the travel-sample dataset, documents are stored with human-readable IDs (Keys). For this exercise, we will retrieve the document for "40-Mile Air."
+
+- **Key (ID)**: airline_10
+
+**Step 2**: The Key/Value "Query"
+Since K/V is an operation rather than a declarative language (like SQL), "querying" depends on the interface you are using.
+
+**Option A**: Via SQL++ (The USE KEYS Clause)
+If you want to simulate a K/V lookup using SQL++ in the Capella Query Workbench to see the execution plan difference, you use the USE KEYS clause. This forces the engine to fetch the doc directly without using a secondary index.
+
+```SQL
+SELECT * FROM `travel-sample`.inventory.airline 
+USE KEYS "airline_10";
+```
+
+Please note the execution time in the Query UI, you should see sub-millisecond response. For comparison, you can run following SQL++ query, which does not explicitly utilize K/V. For this approach you should consider to use appropriate indexes.
+
+```SQL
+SELECT * FROM `travel-sample`.inventory.airline 
+WHERE id = 10;
+```
+
+**Option B**: Via the SDK (Python Example)
+This is how you would implement this in an application. This is the fastest way to get data. (In this workshop, we'll utilize only Option A)
+
+```python
+# Connect to the bucket and collection
+collection = bucket.scope("inventory").collection("airline")
+
+# Perform the Key/Value lookup
+# We simply ask for the ID. No "SELECT", no "FROM".
+result = collection.get("airline_10")
+
+# Print the content
+print(result.content_as[dict])
+```
+
+**Step 3**: The Result
+Regardless of the method used, the database retrieves the full JSON document associated with that key immediately.
+
+Output:
+
+```JSON
+{
+  "callsign": "MILE-AIR",
+  "country": "United States",
+  "iata": "Q5",
+  "icao": "MLA",
+  "id": 10,
+  "name": "40-Mile Air",
+  "type": "airline"
+}
+```
+
+**Why start here?**  
+If you know the ID of the object you need (e.g., a User Profile ID, a Shopping Cart ID), you should always use K/V `get()` rather than writing a `SELECT` statement.
+
+- Latency: Sub-millisecond.
+- Scalability: Scales linearly as you add nodes.
+- Cost: Consumes the least amount of CPU/Memory resources.
+
+## Part 3 - SQL++ Queries 
 The language is very similar, so let's have a look what's similar to ANSI SQL and what's different.
 
 ### Select the name, IATA code, and ICAO code for airlines located in the United States, limiting the result to 5 entries:
@@ -46,8 +116,6 @@ But let's see how to visualise the data we're receiving as the result. Click `Ch
 
 <img width="1047" alt="image" src="https://github.com/user-attachments/assets/f8f1c6ae-2677-4871-9d51-806fff5d2eb7" />
 
-
-
 ### In the route keyspace, flatten the schedule array to get details of the flights on Monday (1):
 ```sql
 SELECT route.sourceairport, route.destinationairport, sched.flight, sched.utc
@@ -56,7 +124,7 @@ UNNEST schedule sched
 WHERE  sched.day = 1
 LIMIT 3;
 ```
-**Explaination**
+**Explanation**
 
 The route documents look like this (simplified):
 ```json
@@ -82,7 +150,7 @@ Summary
 * This makes it easy to filter, select, and display individual schedule entries, not just the parent route document.
 * **UNNEST** lets you treat each item in the schedule array as its own row in your query results, making it easy to filter and select specific flights.
 
-### List only airports in Toulouse which have routes starting from them, and nest details of the routes.
+### List only airports in Toulouse which have routes starting from them, and nest details of the routes:
 ```sql
 SELECT *
 FROM airport a
@@ -91,7 +159,7 @@ FROM airport a
 WHERE a.city = "Toulouse"
 ORDER BY a.airportname;
 ```
-**Explaination**
+**Explanation**
 
 `INNER NEST` is a SQL++ join operation that combines documents from two different datasets based on a specified condition.  
 Unlike a regular `JOIN`, `INNER NEST` embeds the matching documents from the second dataset into an array within the first dataset.
@@ -114,7 +182,7 @@ ORDER BY country_airline_count ASC
 LIMIT 30;
 ```
 
-**Explaination**
+**Explanation**
 
 The line of interest here is `COUNT(*) OVER (PARTITION BY a.country) AS country_airline_count`.  
 This is a `window function`. Here’s what it does:  
@@ -126,7 +194,9 @@ Key Point: What Does the `Window Function` Do?
 
 For each airline, it counts the total number of airlines in that country. The result is not grouped (like with `GROUP BY`), so you still see each airline as a separate row, but with the country’s total airline count attached.
 
-### Retrieve airport names and geo-coordinates, filtering based on latitude and longitude ranges.
+### Retrieve airport names and geo-coordinates, filtering based on latitude and longitude ranges:  
+This is a typical Geo-Spatial querying with geo coordinates.
+
 ```sql
 SELECT ap.airportname, ap.geo.lat, ap.geo.lon
 FROM airport ap
@@ -135,7 +205,7 @@ WHERE ap.geo.lat BETWEEN 40 AND 50
 LIMIT 5;
 ```
 
-**Explaination**
+**Explanation**
 
 Airport documents have a nested structure for geographical information:
 
@@ -175,7 +245,7 @@ ORDER BY route_count DESC
 LIMIT 5;
 ```
 
-**Explaination**
+**Explanation**
 
 * **SELECT**: `a.name AS airline` - returns the airline name
 * **FROM**: `airline a` - references the airline documents in the inventory scope, aliased as `a`.
@@ -204,7 +274,9 @@ After it's built, re-run the query and observe the improved execution time:
 <img width="1409" alt="image" src="https://github.com/user-attachments/assets/21c2a6bb-c73a-4aa6-acb2-ee4bf91f3020" />
 
 
-### Use pattern matching to find airlines whose names start with "A" or contain "Air" with a "B" prefix.
+### Use pattern matching to find airlines whose names start with "A" or contain "Air" with a "B" prefix:  
+In this query we combine `LIKE` with the Regular Expression function `REGEXP_CONTAINS`.  
+
 ```sql
 SELECT a.name, a.icao
 FROM `travel-sample`.inventory.airline a
@@ -212,7 +284,9 @@ WHERE (a.name LIKE "A%"
        OR REGEXP_CONTAINS(a.name, "^[Bb].*[Aa]ir"))
 ORDER BY a.name;
 ```
-**Explaination**
+
+
+**Explanation**
 
 * **FROM**: `FROM airline a` - references airline documents in the inventory scope, aliased as `a`.
 * **WHERE** clause with _compound_ conditions: `a.name LIKE "A%"` - finds airlines whose names start with the letter "A"  
@@ -238,7 +312,7 @@ ORDER BY airport_count DESC
 LIMIT 10;
 ```
 
-**Explaination**
+**Explanation**
 
 * **FROM**: `airport ap` - references airport collection in the inventory scope, aliased as `ap`
 * **SELECT**
@@ -273,7 +347,7 @@ ORDER BY miles_from_nyc
 LIMIT 10;
 ```
 
-**Explaination**
+**Explanation**
 
 - **FROM**:  
   References hotel documents in the `inventory` scope: ``travel-sample.inventory.hotel h`` (aliased as `h`).
@@ -311,7 +385,7 @@ ORDER BY ta.airport_count DESC
 LIMIT 5;
 ```
 
-**Explaination**
+**Explanation**
 
 - **WITH Clause (CTE)** creates a temporary result set called `TopAirports`:
   - `SELECT ap.country, COUNT(*) AS airport_count`: counts airports per country  
@@ -336,7 +410,11 @@ LIMIT 5;
   - `ORDER BY ta.airport_count DESC`: Sorts countries by airport count, highest first  
   - `LIMIT 5`: Returns only the top 5 countries with the most airports
 
-### Graph traversal: a direct flight from LAX to JFK.
+## Part 4 - Graph Traversal Queries  
+Graph traversal in SQL++ is achieved using Common Table Expressions (CTEs), specifically the WITH RECURSIVE clause. This allows you to query hierarchical data (like trees or graphs) by defining a query that refers to itself.
+
+For instance, a direct flight from LAX to JFK:
+
 ```sql
 WITH FlightPath AS (
     SELECT 
@@ -358,7 +436,7 @@ FROM FlightPath AS fp
 WHERE fp.lastStop = "JFK" AND fp.depth = 1;
 ```
 
-**Explaination**
+**Explanation**
 
 This query finds all direct (non-stop) flight routes from Los Angeles International Airport (LAX) to John F. Kennedy International Airport (JFK) using a graph-style traversal pattern.  
 The query demonstrates the SQL++ ability to:  
@@ -424,7 +502,7 @@ FROM FlightPath
 WHERE route[1] = "MIA" AND lastStop = "JFK" AND depth = 2;
 ```
 
-**Explaination**
+**Explanation**
 
 This query uses a recursive Common Table Expression (CTE) to find all two-leg flight paths from Los Angeles International Airport (LAX) to John F. Kennedy International Airport (JFK) that connect through Miami International Airport (MIA). It demonstrates SQL++ ability to:  
 - Use recursive CTEs for graph traversal and multi-hop pathfinding
@@ -462,86 +540,7 @@ This query uses a recursive Common Table Expression (CTE) to find all two-leg fl
   - `lastStop = "JFK"`: ensures the final destination is JFK (New York).
   - `depth = 2`: ensures only two-leg journeys are included.
 
-### Transactions
-Did you know that Couchbase supports [ACID compliant multi-document transactions](https://docs.couchbase.com/server/current/learn/data/transactions.html)?  
-Let's have a look.  
-Before we run one, we need to change some query settings, as our Couchbase Capella instance is a one-node cluster.
-
-Click `Options` in the query editor:
-
-<img width="868" alt="image" src="https://github.com/user-attachments/assets/8ecb3fd2-c47e-4188-9bc8-072b11f045f9" />
-
-And then set 
-- `Transaction timeout` to `120 seconds`
-- `Scan Consistency` to `not_bounded`
-- Add a _Named Parameter_ `durability_level` with the value `"none"`, don't forget the value's quotes!
-
-Hit `Save`
-
-<img width="629" alt="image" src="https://github.com/user-attachments/assets/bda8f0a8-a971-4f2a-ba04-97f264596d8c" />
-
-Now we're good to go. I suggest a simple transaction:
-
-```sql
-BEGIN TRANSACTION;
-
-INSERT INTO `travel-sample`.tenant_agent_00.bookings (KEY, VALUE)
-VALUES ("booking_1", {
-    "customer_id": "cust_123",
-    "hotel_id": "hotel_456",
-    "check_in_date": "2023-10-01",
-    "check_out_date": "2023-10-05",
-    "status": "confirmed"
-});
-
-COMMIT;
-```
-
-**Verification**
-
-
-Once finished, let's switch to the `Documents` tab, set the context to the bucket `travel-sample`, the scope `tenant_agent_00` and the collection `bookings`.  
-Fetch the document by its key - simply type `booking_1` into the `DOC ID` field and hit `Get Documents`:
-
-<img width="1172" alt="image" src="https://github.com/user-attachments/assets/63688ad8-29a8-43e7-a077-06c764a89b02" />
-
-
-Click the document's key to open.
-
-
-**Explaination**
-
-This transaction demonstrates SQL++'s ability to:
-- Use ACID transactions for data consistency
-- Insert documents with explicit key-value pairs
-- Work with multi-tenant data structures (tenant-specific scopes)
-- Handle JSON document creation with nested field structures
-- Ensure data integrity through transaction boundaries
-
-- **BEGIN TRANSACTION:**  
-  Starts a new transaction to ensure atomicity and consistency.  
-  All operations within the transaction will either all succeed or all fail together.
-
-- **INSERT Statement:**  
-  - **Target Collection:**  
-    `travel-sample.tenant_agent_00.bookings`: Inserts into the `bookings` collection within the `tenant_agent_00` scope of the `travel-sample` bucket.
-  
-  - **Document Structure:**  
-    Uses `(KEY, VALUE)` syntax to explicitly specify both the document key and content:
-    - **KEY:** `"booking_1"` - the unique document identifier
-    - **VALUE:** JSON object containing the booking details:
-      - `"customer_id": "cust_123"`: reference to the customer making the booking
-      - `"hotel_id": "hotel_456"`: reference to the booked hotel
-      - `"check_in_date": "2023-10-01"`: guest arrival date
-      - `"check_out_date": "2023-10-05"`: guest departure date  
-      - `"status": "confirmed"`: current booking status
-
-- **COMMIT:**  
-  Finalizes the transaction, making all changes permanent and visible to other operations.  
-  If any error occurred during the transaction, this would trigger a rollback instead.
-
-
-### Time Series Querying
+## Part 5 - Time Series Querying
 For this exercise you will need to download the regular Time Series dataset `time_series_regular.json` (that can be found in this repository).
 The dataset contains daily values for minimum and maximum temperature in 2024 for several locations within Munich.
 The data in this dataset were already pre-converted into Time Series documents ready for querying in Couchbase (each JSON document contains data per location per month).
@@ -592,12 +591,89 @@ WHERE d.location = 'Olympia' -- Filter by location
 ORDER BY t._t;
 ```
 
-**Explaination**
+**Explanation**
 
 - This query uses a CTE (common table expression) to store the date-time range.
 - For each time point, the [_TIMESERIES](https://docs.couchbase.com/cloud/n1ql/n1ql-language-reference/timeseries.html) function calculates the date-time stamp `_t` and returns the values `_v0` and `_v1`.
 - The query adds aliases to the data returned by the _TIMESERIES function and converts the date-time stamp to a readable date-time string.
-   
+
+## Part 6 - ACID Transactions (BONUS)
+Did you know that Couchbase supports [ACID compliant multi-document transactions](https://docs.couchbase.com/server/current/learn/data/transactions.html)?  
+Let's have a look.  
+Before we run one, we need to change some query settings, as our Couchbase Capella instance is a one-node cluster.
+
+Click `Options` in the query editor:
+
+<img width="868" alt="image" src="https://github.com/user-attachments/assets/8ecb3fd2-c47e-4188-9bc8-072b11f045f9" />
+
+And then set 
+- `Transaction timeout` to `120 seconds`
+- `Scan Consistency` to `not_bounded`
+- Add a _Named Parameter_ `durability_level` with the value `"none"`, don't forget the value's quotes!
+
+Hit `Save`
+
+<img width="629" alt="image" src="https://github.com/user-attachments/assets/bda8f0a8-a971-4f2a-ba04-97f264596d8c" />
+
+Now we're good to go. I suggest a simple transaction:
+
+```sql
+BEGIN TRANSACTION;
+
+INSERT INTO `travel-sample`.tenant_agent_00.bookings (KEY, VALUE)
+VALUES ("booking_1", {
+    "customer_id": "cust_123",
+    "hotel_id": "hotel_456",
+    "check_in_date": "2023-10-01",
+    "check_out_date": "2023-10-05",
+    "status": "confirmed"
+});
+
+COMMIT;
+```
+
+**Verification**
+
+
+Once finished, let's switch to the `Documents` tab, set the context to the bucket `travel-sample`, the scope `tenant_agent_00` and the collection `bookings`.  
+Fetch the document by its key - simply type `booking_1` into the `DOC ID` field and hit `Get Documents`:
+
+<img width="1172" alt="image" src="https://github.com/user-attachments/assets/63688ad8-29a8-43e7-a077-06c764a89b02" />
+
+
+Click the document's key to open.
+
+
+**Explanation**
+
+This transaction demonstrates SQL++'s ability to:
+- Use ACID transactions for data consistency
+- Insert documents with explicit key-value pairs
+- Work with multi-tenant data structures (tenant-specific scopes)
+- Handle JSON document creation with nested field structures
+- Ensure data integrity through transaction boundaries
+
+- **BEGIN TRANSACTION:**  
+  Starts a new transaction to ensure atomicity and consistency.  
+  All operations within the transaction will either all succeed or all fail together.
+
+- **INSERT Statement:**  
+  - **Target Collection:**  
+    `travel-sample.tenant_agent_00.bookings`: Inserts into the `bookings` collection within the `tenant_agent_00` scope of the `travel-sample` bucket.
+  
+  - **Document Structure:**  
+    Uses `(KEY, VALUE)` syntax to explicitly specify both the document key and content:
+    - **KEY:** `"booking_1"` - the unique document identifier
+    - **VALUE:** JSON object containing the booking details:
+      - `"customer_id": "cust_123"`: reference to the customer making the booking
+      - `"hotel_id": "hotel_456"`: reference to the booked hotel
+      - `"check_in_date": "2023-10-01"`: guest arrival date
+      - `"check_out_date": "2023-10-05"`: guest departure date  
+      - `"status": "confirmed"`: current booking status
+
+- **COMMIT:**  
+  Finalizes the transaction, making all changes permanent and visible to other operations.  
+  If any error occurred during the transaction, this would trigger a rollback instead.
    
 ---
 
