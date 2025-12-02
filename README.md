@@ -1,6 +1,6 @@
 # SQL++ demo
 ## Prerequisites
-Create a free [Couchbase Capella](https://cloud.couchbase.com/sign-up) account.  
+Create a free [Couchbase Capella](https://cloud.couchbase.com/sign-up{target=_blank}) account.  
 
 Create a Project:  
 
@@ -16,14 +16,14 @@ Click on the cluster name and then go to the `Data Tools` -> `Query`. Set the co
 
 <img width="1190" alt="image" src="https://github.com/user-attachments/assets/76f18544-0252-43cd-ab16-5c9f13b67c25" />
 
-## Introduction
+## Part 1 - Introduction
 Couchbase, being a JSON based data platform, is organising the data differently than RDBMS:
 
 <img width="466" alt="image" src="https://github.com/user-attachments/assets/c1bd8db2-b1c8-4d82-a0d3-bd952bbd7972" />
 
 The language is very similar, so let's have a look what's similar to ANSI SQL and what's different.
 
-### Select the name, IATA code, and ICAO code for airlines located in the United States, limiting the result to 5 entries.
+### Select the name, IATA code, and ICAO code for airlines located in the United States, limiting the result to 5 entries:
 ```sql
 SELECT name, iata, icao
 FROM airline
@@ -33,7 +33,7 @@ LIMIT 5;
 That looks really familiar, because there's no difference between SQL and SQL++: we're `SELECT`-ing some fields `FROM` the collection (remember, that is equal to a table in RDBMS world) `airline`.  
 `WHERE` and `LIMIT` are exactly the same.
 
-### Count the number of airports in each country, ordering the results by the airport count in descending order.
+### Count the number of airports in each country, ordering the results by the airport count in descending order:
 ```sql
 SELECT country, COUNT(*) AS airport_count
 FROM airport
@@ -48,7 +48,7 @@ But let's see how to visualise the data we're receiving as the result. Click `Ch
 
 
 
-### In the route keyspace, flatten the schedule array to get details of the flights on Monday (1).
+### In the route keyspace, flatten the schedule array to get details of the flights on Monday (1):
 ```sql
 SELECT route.sourceairport, route.destinationairport, sched.flight, sched.utc
 FROM route
@@ -599,3 +599,14 @@ ORDER BY t._t;
 - The query adds aliases to the data returned by the _TIMESERIES function and converts the date-time stamp to a readable date-time string.
    
    
+---
+
+## Resources
+
+- **Couchbase SQL++ Docs**: [https://docs.couchbase.com/server/current/n1ql/query.html](https://docs.couchbase.com/server/current/n1ql/query.html{target=_blank})
+- **Couchbase Capella (fully managed DBaaS)**: https://cloud.couchbase.com/sign-up
+- **OpenAI API Docs**: https://platform.openai.com/docs
+- **Vector Search Guide**: https://docs.couchbase.com/server/current/vector-search/vector-search.html
+- **Developer Tutorials**: [https://developer.couchbase.com/tutorials/](https://developer.couchbase.com/tutorials/{target=_blank})
+
+---
