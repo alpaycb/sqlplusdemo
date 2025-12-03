@@ -2,6 +2,10 @@
 ## Prerequisites
 Create a free [Couchbase Capella](https://cloud.couchbase.com/sign-up) account.  
 
+Please open the following [PDF-Document](https://drive.google.com/file/d/1k23Nsagmsrh9-3m4vbSo_L89qJWry79H/view?usp=sharing) and follow the steps in `Part A`.  
+(We'll also have a short look to `Part B` for basic understanding of Couchbase DB structure)
+
+
 Create a Project:  
 
 <img width="680" alt="image" src="https://github.com/user-attachments/assets/fa93d90f-5580-438b-8907-308c13c4d40d" />
@@ -10,7 +14,7 @@ Then, click on the project name and click `Create cluster` button. That opens a 
 
 <img width="1664" alt="image" src="https://github.com/user-attachments/assets/73348531-cefd-485d-a24b-e38142ec2057" />  
 
-After 5 minutes your cluster is ready to be used.
+After a few minutes your cluster is ready to be used.
 
 Click on the cluster name and then go to the `Data Tools` -> `Query`. Set the context to the bucket `travel-sample` and the scope `inventory`:  
 
@@ -36,15 +40,15 @@ In the travel-sample dataset, documents are stored with human-readable IDs (Keys
 **Step 2**: The Key/Value "Query"
 Since K/V is an operation rather than a declarative language (like SQL), "querying" depends on the interface you are using.
 
-**Option A**: Via SQL++ (The USE KEYS Clause)
-If you want to simulate a K/V lookup using SQL++ in the Capella Query Workbench to see the execution plan difference, you use the USE KEYS clause. This forces the engine to fetch the doc directly without using a secondary index.
+**Option A**: Via SQL++ (The `USE KEYS` Clause)
+If you want to simulate a K/V lookup using SQL++ in the Capella Query Workbench to see the execution plan difference, you use the `USE KEYS` clause. This forces the engine to fetch the doc directly without using a secondary index.
 
 ```SQL
 SELECT * FROM `travel-sample`.inventory.airline 
 USE KEYS "airline_10";
 ```
 
-Please note the execution time in the Query UI, you should see sub-millisecond response. For comparison, you can run following SQL++ query, which does not explicitly utilize K/V. For this approach you should consider to use appropriate indexes.
+Please note the execution time in the Query Workbench (`Execution Time`), you should see sub-millisecond response. For comparison, you can run following SQL++ query, which does not explicitly utilize K/V. For this approach you should consider to use appropriate indexes.
 
 ```SQL
 SELECT * FROM `travel-sample`.inventory.airline 
@@ -55,6 +59,7 @@ WHERE id = 10;
 This is how you would implement this in an application. This is the fastest way to get data. (In this workshop, we'll utilize only Option A)
 
 ```python
+...
 # Connect to the bucket and collection
 collection = bucket.scope("inventory").collection("airline")
 
@@ -64,6 +69,7 @@ result = collection.get("airline_10")
 
 # Print the content
 print(result.content_as[dict])
+...
 ```
 
 **Step 3**: The Result
@@ -86,12 +92,12 @@ Output:
 **Why start here?**  
 If you know the ID of the object you need (e.g., a User Profile ID, a Shopping Cart ID), you should always use K/V `get()` rather than writing a `SELECT` statement.
 
-- Latency: Sub-millisecond.
-- Scalability: Scales linearly as you add nodes.
-- Cost: Consumes the least amount of CPU/Memory resources.
+- **Latency**: Sub-millisecond.
+- **Scalability**: Scales linearly as you add nodes.
+- **Cost**: Consumes the least amount of CPU/Memory resources.
 
 ## Part 3 - SQL++ Queries 
-The language is very similar, so let's have a look what's similar to ANSI SQL and what's different.
+The SQL++ language is very similar to ANSI SQL, so let's have a look.
 
 ### Select the name, IATA code, and ICAO code for airlines located in the United States, limiting the result to 5 entries:
 ```sql
@@ -141,7 +147,7 @@ The route documents look like this (simplified):
 Notice that the schedule field is an array of objects - each object represents a flight on a specific day and time.
 
 What does `UNNEST` do here?  
-* `**UNNEST** schedule sched` takes the schedule array from each route document and flattens it.
+* `UNNEST schedule sched` takes the schedule array from each route document and flattens it.
 * For each element in the `schedule` array, it creates a new row in the result, with `sched` representing each schedule entry.
 
 Summary
@@ -173,7 +179,7 @@ What `INNER NEST route r ON a.faa = r.sourceairport` does:
 * Instead of creating a flat, joined result (like a regular JOIN), it nests the matching route documents into an array within the airport document.
 
 
-### Calculate the number of airlines per country, showing the distribution of airlines across different countries.
+### Calculate the number of airlines per country, showing the distribution of airlines across different countries:
 ```sql
 SELECT a.name, a.country, 
        COUNT(*) OVER (PARTITION BY a.country) AS country_airline_count
@@ -234,7 +240,7 @@ Key Point: Accessing Nested Fields
 In SQL++, you use dot notation (.) to access fields within nested objects.  
 `ap.geo.lat` means "go to the ap document, then go to the geo field, and then get the lat field."
 
-### Join airline and route on the IATA code, group by airline name, and count the number of routes per airline.
+### Join airline and route on the IATA code, group by airline name, and count the number of routes per airline:
 ```sql
 SELECT a.name AS airline, COUNT(r.airline) AS route_count
 FROM `travel-sample`.inventory.airline a
@@ -296,7 +302,7 @@ OR
 * **ORDER BY**: sorts results alphabetically by airline name
 
 
-### Categorize airports by region based on their country and counts the number of airports in each region.
+### Categorize airports by region based on their country and counts the number of airports in each region:
 ```sql
 SELECT ap.airportname, ap.country,
        CASE 
@@ -326,7 +332,7 @@ LIMIT 10;
   * `**COUNT(*) AS airport_count**`: counts the number of airports for each combination of airport name, country, and region
 * **GROUP BY** & **LIMIT**: `ORDER BY airport_count DESC` sorts the results by the airport count in descending order, so the airport names with the most occurrences are listed first. `LIMIT 10` returns only the top 10 documents.
 
-### Calculate the distance between each hotel and New York City using geo-coordinates.
+### Calculate the distance between each hotel and New York City using geo-coordinates:
 ```sql
 SELECT h.name AS hotel_name, 
        h.address AS address,
@@ -368,7 +374,7 @@ LIMIT 10;
   - `ORDER BY miles_from_nyc`: Sorts results by distance from NYC, closest first.  
   - `LIMIT 10`: Returns only the 10 closest hotels.
 
-### The CTE (TopAirports) filters countries with more than 50 airports. The main query joins these countries to airlines and aggregates airline names per country.
+### The CTE (TopAirports) filters countries with more than 50 airports. The main query joins these countries to airlines and aggregates airline names per country:
 ```sql
 WITH TopAirports AS (
   SELECT ap.country, COUNT(*) AS airport_count
@@ -411,62 +417,9 @@ LIMIT 5;
   - `LIMIT 5`: Returns only the top 5 countries with the most airports
 
 ## Part 4 - Graph Traversal Queries  
-Graph traversal in SQL++ is achieved using Common Table Expressions (CTEs), specifically the WITH RECURSIVE clause. This allows you to query hierarchical data (like trees or graphs) by defining a query that refers to itself.
+Graph traversal in SQL++ is achieved using Common Table Expressions (CTEs), specifically the WITH RECURSIVE clause. This allows you to query hierarchical data (like trees or graphs) by defining a query that refers to itself.  
 
-For instance, a direct flight from LAX to JFK:
-
-```sql
-WITH FlightPath AS (
-    SELECT 
-        [source.faa, destination.faa] AS route,
-        destination.faa AS lastStop,
-        r.airline,
-        r.schedule,
-        1 AS depth
-    FROM route AS r
-    JOIN airport source ON r.sourceairport = source.faa
-    JOIN airport destination ON r.destinationairport = destination.faa
-    WHERE source.faa = "LAX"
-)
-SELECT 
-    fp.route,
-    fp.airline,
-    ARRAY s FOR s IN fp.schedule END AS schedule
-FROM FlightPath AS fp
-WHERE fp.lastStop = "JFK" AND fp.depth = 1;
-```
-
-**Explanation**
-
-This query finds all direct (non-stop) flight routes from Los Angeles International Airport (LAX) to John F. Kennedy International Airport (JFK) using a graph-style traversal pattern.  
-The query demonstrates the SQL++ ability to:  
-- Use CTEs to model graph traversal patterns (flight paths)
-- Join collections multiple times for source and destination relationships
-- Build and filter arrays to represent paths
-- Filter for direct connections using a "depth" field
-- Aggregate and return schedule data as arrays
-
-- **WITH Clause (`FlightPath` CTE)**: defines a temporary result set representing all direct flight paths starting from LAX.
-  - `SELECT [source.faa, destination.faa] AS route`: creates an array representing the route from the source airport to the destination airport using their FAA codes.
-  - `destination.faa AS lastStop`: stores the FAA code of the destination airport as the last stop in the route.
-  - `r.airline`: includes the airline operating the route.
-  - `r.schedule`: includes the schedule information for the route.
-  - `1 AS depth`:  sets the depth to 1, indicating a direct (single-leg) flight.
-  - `FROM route AS r`: uses the `route` collection as the main data source.
-  - `JOIN airport source ON r.sourceairport = source.faa`: joins the `airport` collection to get details about the source airport.
-  - `JOIN airport destination ON r.destinationairport = destination.faa`: joins the `airport` collection again to get details about the destination airport.
-  - `WHERE source.faa = "LAX"`: filters to only include routes that start at LAX.
-
-- **Main SELECT**:  
-  - `fp.route`: returns the array representing the route (e.g., `["LAX", "JFK"]`).
-  - `fp.airline`: returns the airline operating the route.
-  - `ARRAY s FOR s IN fp.schedule END AS schedule`: returns the schedule for the route as an array.
-
-- **WHERE**:   
-  - `fp.lastStop = "JFK"`: filters to only include routes where the destination is JFK.
-  - `fp.depth = 1`: ensures only direct flights (no layovers) are included.
-
-### Graph traversal: a flight from LAX to JFK over MIA.
+### Graph traversal 1: a flight from LAX to JFK over MIA.
 ```sql
 WITH RECURSIVE FlightPath AS (
     SELECT 
@@ -540,6 +493,86 @@ This query uses a recursive Common Table Expression (CTE) to find all two-leg fl
   - `lastStop = "JFK"`: ensures the final destination is JFK (New York).
   - `depth = 2`: ensures only two-leg journeys are included.
 
+### Graph Traversal 2: Flight Planning (Multi-hop)
+Let's say we want to fly from London Heathrow (LHR) to San Francisco (SFO). A direct flight is easy to find, but what if we want to find routes with up to 1 stop (2 hops)?
+
+This requires a graph traversal: LHR -> [Any Airport] -> SFO.
+
+Copy and paste this into the Query Workbench. This query builds a "virtual table" of possible paths starting from LHR.
+
+```sql
+WITH RECURSIVE travel_paths AS (
+    -- 1. The "Anchor" Clause
+    -- This defines the starting point (Depth 0)
+    SELECT 
+        r.sourceairport, 
+        r.destinationairport, 
+        r.airline, 
+        0 as stops, 
+        [r.sourceairport, r.destinationairport] as pathGT
+    FROM `travel-sample`.inventory.route r
+    WHERE r.sourceairport = 'LHR'
+
+    UNION ALL
+
+    -- 2. The "Recursive" Clause
+    -- This joins the previous results with new routes to extend the path
+    SELECT 
+        next_r.sourceairport, 
+        next_r.destinationairport, 
+        next_r.airline, 
+        tp.stops + 1 as stops,
+        ARRAY_APPEND(tp.pathGT, next_r.destinationairport) as pathGT
+    FROM travel_paths tp
+    JOIN `travel-sample`.inventory.route next_r 
+        ON tp.destinationairport = next_r.sourceairport
+    
+    -- 3. Termination / Safety Limits
+    -- Stop looking if we reach SFO or exceed 1 stop (2 hops)
+    WHERE tp.stops < 1 
+      AND tp.destinationairport != 'SFO'
+)
+-- 4. Final Projection
+SELECT * FROM travel_paths 
+WHERE destinationairport = 'SFO'
+ORDER BY stops;
+```
+**Explanation**  
+This structure is standard across modern SQL databases but is powerful in a document store like Couchbase because it avoids the need for a separate Graph Database for light traversal logic.
+
+**Step 1** is the Anchor start  
+```sql
+SELECT ... FROM route WHERE sourceairport = 'LHR'
+```
+
+This executes once. It finds all flights departing immediately from London Heathrow. These are our "1st hop" candidates.
+
+**Step 2** is the recursive part (iteration)
+```sql
+FROM travel_paths tp
+JOIN route next_r ON tp.destinationairport = next_r.sourceairport
+```
+
+This is the magic. The database takes the results from the previous step (`tp`) and joins them back to the route table (`next_r`).
+- It looks at where we just landed (`tp.destinationairport`)
+- It finds flights leaving from there (`next_r.sourceairport`)
+
+**Step 3** is the path tracker  
+```sql
+ARRAY_APPEND(tp.path, next_r.destinationairport)
+```
+
+Since we are using JSON, we can build an array to visualize the journey:
+- Pass 1: ["LHR", "JFK"]
+- Pass 2: ["LHR", "JFK", "SFO"]
+
+**Step 4** is the safety break
+```sql
+WHERE tp.stops < 1
+```
+
+Recursive queries can run forever (infinite loops) if the graph is circular (e.g., LHR -> JFK -> LHR). We explicitly limit the recursion depth to 1 stop to prevent this and ensure the query returns quickly during the meetup.
+
 ## Part 5 - Time Series Querying
 For this exercise you will need to download the regular Time Series dataset `time_series_regular.json` (that can be found in this repository).
 The dataset contains daily values for minimum and maximum temperature in 2024 for several locations within Munich.
@@ -600,7 +633,8 @@ ORDER BY t._t;
 ## Part 6 - ACID Transactions (BONUS)
 Did you know that Couchbase supports [ACID compliant multi-document transactions](https://docs.couchbase.com/server/current/learn/data/transactions.html)?  
 Let's have a look.  
-Before we run one, we need to change some query settings, as our Couchbase Capella instance is a one-node cluster.
+In order to be able to run ACID transactions, we need to change some query settings, as our Couchbase Capella instance is a one-node cluster.
+(This part is for information purposes only, as ACID transactions cannot be run directly from Query Workbench, we'll go through the theory behind the ACID transactions.)
 
 Click `Options` in the query editor:
 
@@ -615,66 +649,91 @@ Hit `Save`
 
 <img width="629" alt="image" src="https://github.com/user-attachments/assets/bda8f0a8-a971-4f2a-ba04-97f264596d8c" />
 
-Now we're good to go. I suggest a simple transaction:
+These were the essential settings for the database, to enable ACID transactions. 
+
+Let's have a look at following transaction:
 
 ```sql
-BEGIN TRANSACTION;
+-- 1. Begin the Transaction
+START TRANSACTION;
 
-INSERT INTO `travel-sample`.tenant_agent_00.bookings (KEY, VALUE)
-VALUES ("booking_1", {
-    "customer_id": "cust_123",
-    "hotel_id": "hotel_456",
-    "check_in_date": "2023-10-01",
-    "check_out_date": "2023-10-05",
-    "status": "confirmed"
-});
+-- 2. First Mutation: The valid name change
+UPDATE `travel-sample`.inventory.airline
+SET name = "50-Mile Air"
+WHERE id = 10;
 
-COMMIT;
-```
+-- 3. Create a Safety Net
+SAVEPOINT name_changed_successfully;
 
-**Verification**
+-- 4. Second Mutation: The mistake (Simulating a bad logic)
+-- We accidentally remove the callsign
+UPDATE `travel-sample`.inventory.airline
+UNSET callsign
+WHERE id = 10;
 
+-- 5. Verification (Optional within the transaction)
+-- If you queried here, you would see the callsign is gone.
 
-Once finished, let's switch to the `Documents` tab, set the context to the bucket `travel-sample`, the scope `tenant_agent_00` and the collection `bookings`.  
-Fetch the document by its key - simply type `booking_1` into the `DOC ID` field and hit `Get Documents`:
+-- 6. The Fix: Rollback only to the Savepoint
+-- This undoes Step 4, but keeps Step 2
+ROLLBACK TRANSACTION TO SAVEPOINT name_changed_successfully;
 
-<img width="1172" alt="image" src="https://github.com/user-attachments/assets/63688ad8-29a8-43e7-a077-06c764a89b02" />
-
-
-Click the document's key to open.
-
-
-**Explanation**
+-- 7. Finalize
+COMMIT TRANSACTION;
+```  
 
 This transaction demonstrates SQL++'s ability to:
 - Use ACID transactions for data consistency
-- Insert documents with explicit key-value pairs
-- Work with multi-tenant data structures (tenant-specific scopes)
-- Handle JSON document creation with nested field structures
+- With essential features like `SAVEPOINT` and `Rollback`
 - Ensure data integrity through transaction boundaries
 
+**Explanation**  
 - **BEGIN TRANSACTION:**  
-  Starts a new transaction to ensure atomicity and consistency.  
+  Starts a new transaction to ensure atomicity and consistency.
+  This tells the Query Service to create a transaction context. We track the documents we intend to change.   
   All operations within the transaction will either all succeed or all fail together.
 
-- **INSERT Statement:**  
-  - **Target Collection:**  
-    `travel-sample.tenant_agent_00.bookings`: Inserts into the `bookings` collection within the `tenant_agent_00` scope of the `travel-sample` bucket.
-  
-  - **Document Structure:**  
-    Uses `(KEY, VALUE)` syntax to explicitly specify both the document key and content:
-    - **KEY:** `"booking_1"` - the unique document identifier
-    - **VALUE:** JSON object containing the booking details:
-      - `"customer_id": "cust_123"`: reference to the customer making the booking
-      - `"hotel_id": "hotel_456"`: reference to the booked hotel
-      - `"check_in_date": "2023-10-01"`: guest arrival date
-      - `"check_out_date": "2023-10-05"`: guest departure date  
-      - `"status": "confirmed"`: current booking status
+- **SAVEPOINT**
+  Think of this as a "bookmark" in your transaction log.  
+  - If we had run `ROLLBACK TRANSACTION` (without the `TO SAVEPOINT` clause), both updates would have been discarded.
+  - Because we used `TO SAVEPOINT`, we selectively undid only the "bad" update.
 
 - **COMMIT:**  
-  Finalizes the transaction, making all changes permanent and visible to other operations.  
+  Finalizes the transaction, making all changes permanent and visible to other operations.
+  This is the moment of truth. Couchbase checks to ensure no one else modified these documents while we were working. If the coast is clear, the changes are durably written to disk.  
   If any error occurred during the transaction, this would trigger a rollback instead.
-   
+
+**Verifying the Result**  
+
+Now, let's verify that the name changed, but the callsign is still there (meaning our rollback worked).
+Run the following query in query workbench:
+
+```sql
+SELECT name, callsign 
+FROM `travel-sample`.inventory.airline 
+USE KEYS "airline_10";
+```
+
+The query result will be shown as follows:
+
+```json
+[
+  {
+    "callsign": "MILE-AIR",     
+    "name": "50-Mile Air"       
+  }
+]
+```
+
+- Name: Updated to `50-Mile Air` (The Commit kept this)
+- Callsign: Still `MILE-AIR` (The Rollback saved this).
+
+
+> [!NOTE]
+> While SQL++ transactions are amazing for ad-hoc fixes and testing, in your actual Python/Java/Go applications, you usually won't write `START` and `COMMIT` manually.
+> Instead, you will use the SDK's lambda approach (e.g., `cluster.transactions.run(lambda ctx: ...)`).
+> This allows the SDK to automatically retry the transaction for you if a conflict occurs—something a manual SQL script cannot do automatically!
+
 ---
 
 ## Resources
