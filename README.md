@@ -419,6 +419,8 @@ LIMIT 5;
 ## Part 4 - Graph Traversal Queries  
 Graph traversal in SQL++ is achieved using Common Table Expressions (CTEs), specifically the WITH RECURSIVE clause. This allows you to query hierarchical data (like trees or graphs) by defining a query that refers to itself.  
 
+<img width="2816" height="1536" alt="GraphTraversalSample2" src="https://github.com/user-attachments/assets/28b0c8e4-82b5-48af-92de-1c16f3e4330f" />
+
 ### Graph traversal 1: a flight from LAX to JFK over MIA.
 ```sql
 WITH RECURSIVE FlightPath AS (
